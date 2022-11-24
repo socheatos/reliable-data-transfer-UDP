@@ -65,42 +65,28 @@ def unpack(packet):
     msg_size = len(packet)-8
     return struct.unpack(f'!4H{msg_size}s',packet)
 
-def checkSum(data,client_side=True):
-    # assumes data is binary
-	s = 0
-	for i in data:
-		i = int(i,2)
-		s += i
-		s = (s & 0xffff) + (s >> 16) # Take the first 16 bits, and then add 17 bits (the value of the carry is added to the first bit)
-	if client_side:
-		return (~s & 0xffff)
-	return s 
-
-def verifyCheckSum(cs_client,cs_server):
-    # assumes data is integer
-    c = bin(cs_client)
-    s = bin(cs_server)
-    if not checkSum([c,s]):
-        # PASS
-        return 1
-    return 0
-
-def intToBinary(num):
-    # return '{0:016b}'.format(num)
-    return bin(num)
+def checkSum(source,destination,messages=None,client_side=True):
+    source, destination = bin(source), bin(destination)
+    data = [source,destination]
+    if messages:
+        messages = stringToBit(messages)
+        data = [source,destination,*messages]
+    s = 0
+    for i in data:
+        i = int(i,2)
+        s += i
+        s = (s & 0xffff) + (s >> 16) # Take the first 16 bits, and then add 17 bits (the value of the carry is added to the first bit)
+    if client_side:
+        return (~s & 0xffff)
+    return s 
 
 def stringToBit(string):
-    '''Converts string to 8-bit signed char'''
+    '''Converts string to 16-bit signed char and place them in
+    a list for checksum calculation'''
     if isinstance(string, bytes):
         string = string.decode()
-    res = ''.join(format(ord(i), '016b') for i in string)
+    res = [format(ord(i),'016b') for i in string]
     return res
 
-
-def bitSplit(bits,n=16):
-    r = [bits[i:i+n] for i in range(0,len(bits),n)]        
-    return r
-
-
-
-    
+# Q: how to handle packet loss?
+# Q: how to handle retransmission
