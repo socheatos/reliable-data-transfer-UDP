@@ -1,6 +1,7 @@
 import socket
 import time
 import random
+import helper as h
 '''
 After pinging the server, print the Round Trip Time (RTT)
 when the server responds with the corresponding pong.
@@ -15,48 +16,32 @@ Packets can arrive to find a full queue - but with no place to store such packet
 A packet loss will look like a packet having been transmitted into the network core but never emerging from the network at the destination. The fraction of lost packets increases as traffic intensity increases
 '''
 
+# Define some network parameters
+TIMEOUT = 5
+BUFFER_SIZE = 2048
+
+
 # serverName = '172.20.10.4'     # string containing either IP address of server or hostname of server
 serverName = socket.gethostname()
 serverPort = 12000
 
-# create client's socket
-# AF_INET - underlying network using iPv4
-# SOCK_DGRAM - indicates UPD socket
+clientMessage = input('Please enter your message: ')
+clientCheckSum = h.checkSum(0, serverPort,clientMessage)
+clientSegmentLength = len(clientMessage)+8
+clientSegment = h.pack(0,serverPort,clientSegmentLength,clientCheckSum,clientMessage)
+
+# create client's socket using iPv4 and UDP socet
 clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-clientSocket.settimeout(1) # set time out 
+clientSocket.settimeout(TIMEOUT) # set time out 5 sec
 
-numIter = int(input('Enter number of packets to send:'))
-mssges = [str(i)+' ping ' for i in range(numIter)]
-for i in range(numIter):
-    artificial_loss_int = random.randint(0,10)
-    
-    # records the RTT 
-    rttStart = time.time()
+clientSocket.sendto(clientSegment, (serverName,serverPort))
 
-    # artificial loss 
-    if artificial_loss_int < 4:
-        print('loss injected')
-        continue
+# handles timeout error
 
-    # send message through socket to the destination host 
-    # encode() converts string type to byte type
-    message = mssges[i]
-    clientSocket.sendto(message.encode(), (serverName, serverPort))
+try:
+    serverMsg, serverAddr = clientSocket.recvfrom(BUFFER_SIZE)
+    print(f'SERVER MESSAGE: {serverMsg.decode()}')
+except socket.timeout:
+    print('Client side timeout!')
 
-    # returns packet arriving from internet at client's socket and packet's source address (server's IP, port number)
-    # .recvfrom(x) takes the buffer size x
-
-    modifiedMessage, serverAddress = clientSocket.recvfrom(2048)
-    rttEnd = time.time()
-
-    if modifiedMessage:
-        print(modifiedMessage.decode(), '-',str(rttEnd-rttStart)+'s')
-    else:
-        print('Request timed out')
-    
-
-    # wait for 1 second if nothing received then this packet is marked
-    # as loss during transmission
-
-    # print(modifiedMessage.decode(), '-',str(rttEnd-rttStart)+'s')
 clientSocket.close()
