@@ -8,7 +8,7 @@ TO DO:
 [x] deal with timeouts
 [x] deal with losses
     [x] artificial losses
-[ ] add RTT
+[x] add RTT
 '''
 
 # Define some network parameters
@@ -51,22 +51,28 @@ if __name__== "__main__":
     messages = [str(i)+' ping' for i in range(10)]
     FLAG = len(messages)>0
     timeouts = 0
+    RTT = []
     while FLAG:
+        RTT.append(time.time())
         sendMsg(clientSocket, messages[0], serverAddr)
         try: 
             serverMsg,serverAddr = rcvMsg(clientSocket)
-            print(f'Message receieved: {serverMsg} ')
             # keep retransmitting if the message is NACK
             while serverMsg == 'NACK':
                 print('NACK received ... retransmitting last message')
                 sendMsg(clientSocket, messages[0], serverAddr)
                 serverMsg,serverAddr = rcvMsg(clientSocket)
-                print(f'Message received {serverMsg}')
+            
+            RTT.append(time.time())
+            print(f'Message receieved: {serverMsg} - RTT:{(max(RTT)-min(RTT))*1000} msec')
             
             del messages[0]
             FLAG = len(messages)>0
-
+            RTT = []
+            
+        
         except socket.timeout:
+            RTT.append(time.time())
             timeouts +=1
             if timeouts<10:
                 print(f'TIMEOUT {timeouts}')
@@ -74,6 +80,7 @@ if __name__== "__main__":
             else:
                 FLAG = False
                 print('Too many timeouts in this connection')
+            
 
         
 
