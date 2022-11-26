@@ -5,46 +5,78 @@ import helper as h
 '''
 TO DO:
 -----
-- do i really want to do go back n?
-- handle ACK/NACKs: 
-    - if NACK - retransmit
-    - if ACK - all good?
-- calculate RTT
-- make sure timeouts work w multiple message
-- artificial loss/bit corruption
-
-LOSS SCENARIOS:
-- buffer size too big? - split it up / send separately w sequence number as last word on 
-- time outs? - reconnect & retransmit
-- no ACK/NACK? - retransmit
+[x] deal with timeouts
+[x] deal with losses
+    [x] artificial losses
+[ ] add RTT
 '''
 
 # Define some network parameters
-TIMEOUT = 5
+TIMEOUT = 2
 BUFFER_SIZE = 2048
+LOSS = True
+LOSS_RATE = 4
 
+def sendMsg(socket,message, serverAddr,artLoss=LOSS):
+    if artLoss:
+        if artificialLoss():
+            message = ' '
 
-# serverName = '172.20.10.4'     # string containing either IP address of server or hostname of server
-serverName = socket.gethostname()
-serverPort = 12000
+    # print(f'sent {message}')
+    socket.sendto(message.encode(), serverAddr)
 
-clientMessage = input('Please enter your message: ')
-clientCheckSum = h.checkSum(0, serverPort,clientMessage)
-clientSegmentLength = len(clientMessage)+8
-clientSegment = h.pack(0,serverPort,clientSegmentLength,clientCheckSum,clientMessage)
+def rcvMsg(socket, BUFFER_SIZE = BUFFER_SIZE):
+    # handles NACK
+    serverMsg, serverAddr = socket.recvfrom(BUFFER_SIZE)
+    serverMsg = serverMsg.decode()
+    return serverMsg, serverAddr
+    
+def artificialLoss():
+    artificialLoss = random.randint(0,10)
+    if artificialLoss<LOSS_RATE:    
+        return 1
+    return 0
 
-# create client's socket using iPv4 and UDP socet
-clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-clientSocket.settimeout(TIMEOUT) # set time out 5 sec
+if __name__== "__main__":
 
-clientSocket.sendto(clientSegment, (serverName,serverPort))
+    # serverName = '172.20.10.4'     # string containing either IP address of server or hostname of server
+    serverName = socket.gethostname()
+    serverPort = 12000
+    serverAddr = (serverName, serverPort)
+    # create client's socket using iPv4 and UDP socet
+    clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    clientSocket.settimeout(TIMEOUT) # set time out 5 sec
 
-# handles timeout error
+    # messages to be sent:
+    messages = [str(i)+' ping' for i in range(10)]
+    FLAG = len(messages)>0
+    timeouts = 0
+    while FLAG:
+        sendMsg(clientSocket, messages[0], serverAddr)
+        try: 
+            serverMsg,serverAddr = rcvMsg(clientSocket)
+            print(f'Message receieved: {serverMsg} ')
+            # keep retransmitting if the message is NACK
+            while serverMsg == 'NACK':
+                print('NACK received ... retransmitting last message')
+                sendMsg(clientSocket, messages[0], serverAddr)
+                serverMsg,serverAddr = rcvMsg(clientSocket)
+                print(f'Message received {serverMsg}')
+            
+            del messages[0]
+            FLAG = len(messages)>0
 
-try:
-    serverMsg, serverAddr = clientSocket.recvfrom(BUFFER_SIZE)
-    print(f'SERVER MESSAGE: {serverMsg.decode()}')
-except socket.timeout:
-    print('Client side timeout! Retransmitting...')
+        except socket.timeout:
+            timeouts +=1
+            if timeouts<10:
+                print(f'TIMEOUT {timeouts}')
+                print('Timeout occurred... retransmitting last message')
+            else:
+                FLAG = False
+                print('Too many timeouts in this connection')
 
-clientSocket.close()
+        
+
+    print('Closing connection...')
+    clientSocket.close()
+    
