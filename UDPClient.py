@@ -3,17 +3,20 @@ import time
 import random
 import helper as h
 '''
-After pinging the server, print the Round Trip Time (RTT)
-when the server responds with the corresponding pong.
-≈
 TO DO:
-- packet loss detection
-- send retransmission
+-----
+- do i really want to do go back n?
+- handle ACK/NACKs: 
+    - if NACK - retransmit
+    - if ACK - all good?
+- calculate RTT
+- make sure timeouts work w multiple message
+- artificial loss/bit corruption
 
-Notes on Packet Loss
-Packets can arrive to find a full queue - but with no place to store such packet, the router will drop that packet i.e. the packe twill be lost.
-
-A packet loss will look like a packet having been transmitted into the network core but never emerging from the network at the destination. The fraction of lost packets increases as traffic intensity increases
+LOSS SCENARIOS:
+- buffer size too big? - split it up / send separately w sequence number as last word on 
+- time outs? - reconnect & retransmit
+- no ACK/NACK? - retransmit
 '''
 
 # Define some network parameters
@@ -42,6 +45,6 @@ try:
     serverMsg, serverAddr = clientSocket.recvfrom(BUFFER_SIZE)
     print(f'SERVER MESSAGE: {serverMsg.decode()}')
 except socket.timeout:
-    print('Client side timeout!')
+    print('Client side timeout! Retransmitting...')
 
 clientSocket.close()

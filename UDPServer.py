@@ -1,3 +1,11 @@
+'''
+TO DO:
+-----
+- checksum verification
+- package ACK/NACK back in 
+- do i really want to do go back n?
+'''
+
 import socket
 import helper as h
 
