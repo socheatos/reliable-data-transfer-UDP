@@ -1,7 +1,6 @@
 import socket
 import time
 import random
-import helper as h
 '''
 TO DO:
 -----
@@ -15,14 +14,15 @@ TO DO:
 TIMEOUT = 2
 BUFFER_SIZE = 2048
 LOSS = True
-LOSS_RATE = 4
+LOSS_RATE = 5
+WINDOW_SIZE = 3
 
 def sendMsg(socket,message, serverAddr,artLoss=LOSS):
     if artLoss:
         if artificialLoss():
             message = ' '
 
-    # print(f'sent {message}')
+    print(f'sent {message}')
     socket.sendto(message.encode(), serverAddr)
 
 def rcvMsg(socket, BUFFER_SIZE = BUFFER_SIZE):
@@ -36,6 +36,22 @@ def artificialLoss():
     if artificialLoss<LOSS_RATE:    
         return 1
     return 0
+
+def selectiveRepeat(clientSocket,slidingWindow):    
+    #  send all messages in window at once
+        
+    print('to send messgae',slidingWindow)
+    while len(slidingWindow)>0:
+        serverMsg, serverAddr = rcvMsg(clientSocket)
+        print(f'Message receieved: {serverMsg}')
+        if serverMsg != 'NACK':
+            ack = serverMsg[:-5]
+            if ack in slidingWindow:
+                idx = slidingWindow.index(ack)
+                del slidingWindow[idx]
+        for msg in slidingWindow:
+            sendMsg(clientSocket, msg, serverAddr)
+    
 
 if __name__== "__main__":
 
@@ -51,38 +67,39 @@ if __name__== "__main__":
     messages = [str(i)+' ping' for i in range(10)]
     FLAG = len(messages)>0
     timeouts = 0
-    RTT = []
     while FLAG:
-        RTT.append(time.time())
-        sendMsg(clientSocket, messages[0], serverAddr)
-        try: 
-            serverMsg,serverAddr = rcvMsg(clientSocket)
-            # keep retransmitting if the message is NACK
-            while serverMsg == 'NACK':
-                print('NACK received ... retransmitting last message')
-                sendMsg(clientSocket, messages[0], serverAddr)
-                serverMsg,serverAddr = rcvMsg(clientSocket)
+        winSize = WINDOW_SIZE if len(messages)>WINDOW_SIZE else len(messages)
+        slidingWindow = messages[:winSize]
+        # send all messages in window at once
+        for msg in slidingWindow:
+            sendMsg(clientSocket, msg, serverAddr)
+        try:
+            # selectiveRepeat(clientSocket,slidingWindow)
+            print('to send messgae',slidingWindow)
+            while len(slidingWindow)>0:
+                serverMsg, serverAddr = rcvMsg(clientSocket)
+                print(f'Message received: {serverMsg}')
+                if serverMsg != 'NACK':
+                    ack = serverMsg[:-5]
+                    if ack in slidingWindow:
+                        idx = slidingWindow.index(ack)
+                        del slidingWindow[idx]
+                        
+                for msg in slidingWindow:
+                    sendMsg(clientSocket, msg, serverAddr)
             
-            RTT.append(time.time())
-            print(f'Message receieved: {serverMsg} - RTT:{(max(RTT)-min(RTT))*1000} msec')
-            
-            del messages[0]
+            del messages[:winSize]
             FLAG = len(messages)>0
-            RTT = []
-            
-        
+
         except socket.timeout:
-            RTT.append(time.time())
             timeouts +=1
-            if timeouts<10:
-                print(f'TIMEOUT {timeouts}')
+            if timeouts<5:
+                print(f'TIMEOUT {timeouts} - remaining msgs in this sliding window {slidingWindow}')
                 print('Timeout occurred... retransmitting last message')
+
             else:
                 FLAG = False
                 print('Too many timeouts in this connection')
-            
-
-        
 
     print('Closing connection...')
     clientSocket.close()

@@ -14,7 +14,7 @@ import random
 TIMEOUT = 10
 BUFFER_SIZE = 2048
 LOSS = True
-LOSS_RATE = 3
+LOSS_RATE = 2
 
 def artificialLoss():
     artificialLoss = random.randint(0,10)
@@ -28,8 +28,9 @@ def sendMsg(socket, message,clientAddr, artLoss = LOSS):
         socket.sendto(message, clientAddr)
     else:
         if artificialLoss():
-            print('LOSS')
+            print(f'SERVER SIDE LOSS did not send {message}')
         else:
+            print(f'SENT {message}')
             socket.sendto(message, clientAddr)
       
 
@@ -42,8 +43,7 @@ def rcvMsg(socket,BUFFER_SIZE = BUFFER_SIZE):
         msg = 'NACK'
         print('--')
     else:
-        print('Message received')
-        msg = str(msg.upper())+ ' PONG!'
+        msg = str(msg)+ ' PONG'
     
     # sendMsg(socket, msg, clientAddress)
     return msg, clientAddress
@@ -58,10 +58,18 @@ if __name__=='__main__':
     print('The server is ready to receive...')
 
     FLAG = True
+    buffer = set()
+    delivered = []
     while FLAG:
         try:
             msg, clientAddr = rcvMsg(serverSocket)
-            sendMsg(serverSocket, msg, clientAddr)
+            if msg not in buffer and msg != "NACK":
+                print(f'Message received {msg}')
+                sendMsg(serverSocket, msg, clientAddr)
+            if msg in buffer and msg!= 'NACK':
+                print(f'DISCARDED: {msg}')
+
+            buffer.add(msg)
         except socket.timeout:
             print('Server time out...closing connection')
             FLAG = False
